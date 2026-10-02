@@ -1,0 +1,12 @@
+[project]
+name = "firered-decision-controller"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["fastapi", "uvicorn", "pydantic", "python-dotenv", "requests", "typed-argument-parser"]
+
+[project.optional-dependencies]
+test = ["pytest", "httpx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests_decision_controller"]
+pythonpath = ["."]

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Tuple
 
 from .. import fog_of_war
 from .. import game_data
-from ..config import MGBA_API_URL
+from firered_bridge.config import DIALOG_CACHE_ENABLED, MGBA_API_URL
 from ..constants.addresses import *  # noqa: F403
 from ..constants.behaviors import (
     ARROW_WARP_DELTA_BY_BEHAVIOR_ID,
@@ -187,7 +187,7 @@ def build_full_state() -> Dict[str, Any]:
                 int(snap.get("sb2_ptr") or 0),
                 sig.digest(),
             )
-            if _LAST_DIALOG_CACHE_KEY == dialog_key and _LAST_DIALOG_CACHE_STATE is not None:
+            if DIALOG_CACHE_ENABLED and _LAST_DIALOG_CACHE_KEY == dialog_key and _LAST_DIALOG_CACHE_STATE is not None:
                 dialog_state = _LAST_DIALOG_CACHE_STATE
                 dialog_cache_hit = True
             else:

@@ -16,3 +16,6 @@ MGBA_SOCKET_HOST = os.environ.get("MGBA_SOCKET_HOST", "127.0.0.1")
 MGBA_SOCKET_PORT = int(os.environ.get("MGBA_SOCKET_PORT", 8888))
 MGBA_SOCKET_PORT_MAX = int(os.environ.get("MGBA_SOCKET_PORT_MAX", MGBA_SOCKET_PORT + 8))
 MGBA_SOCKET_TIMEOUT = float(os.environ.get("MGBA_SOCKET_TIMEOUT", 2.0))
+
+# Some UI readers access memory beyond the cached snapshot ranges.
+DIALOG_CACHE_ENABLED = os.environ.get("FIRERED_DIALOG_CACHE", "1") != "0"

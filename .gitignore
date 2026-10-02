@@ -8,3 +8,14 @@ server/.env
 .env
 server/backup
 backup_saves
+
+.venv/
+.runtime/
+__pycache__/
+.pytest_cache/
+*.gba
+*.gb
+*.sav
+*.ss0
+core
+core.*

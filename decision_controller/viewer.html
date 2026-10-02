@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FireRed controller staging</title>
+<style>body{background:#111827;color:#e5e7eb;font:16px system-ui;max-width:1100px;margin:24px auto;padding:16px}img{width:480px;max-width:100%;image-rendering:pixelated;border:2px solid #475569}button{display:block;background:#1e293b;color:#eee;border:1px solid #64748b;padding:10px;margin:6px 0;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#1e293b;padding:14px}#status{color:#fbbf24}.columns{display:flex;gap:24px;flex-wrap:wrap}</style>
+<h1>FireRed controller staging</h1><p id="status">Connecting…</p>
+<p>Manual validation. Model disconnected; autonomous play is disabled.</p>
+<div class="columns"><div><img id="screen" alt="Live FireRed framebuffer"><p id="location"></p><button id="save">Save checkpoint</button></div><div id="options"></div></div>
+<pre id="details"></pre>
+<script>
+let snapshot=null,busy=false;
+async function refresh(){if(busy)return;try{const r=await fetch('/api/state');if(!r.ok)throw Error(await r.text());snapshot=await r.json();const s=snapshot.state;document.getElementById('status').textContent='Live · '+s.mode+' · model disconnected';document.getElementById('location').textContent=s.location.name?s.location.name+' '+JSON.stringify(s.location.position):'Opening sequence';document.getElementById('details').textContent=JSON.stringify(s,null,2);const o=document.getElementById('options');o.replaceChildren();for(const option of snapshot.options){const b=document.createElement('button');b.textContent=option.label+': '+option.description;b.onclick=()=>execute(option.id);o.appendChild(b)}}catch(e){document.getElementById('status').textContent='State unavailable: '+e.message}}
+async function execute(id){if(busy||!snapshot)return;busy=true;document.getElementById('status').textContent='Executing local choice…';try{const r=await fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice_id:id,fingerprint:snapshot.fingerprint})});const result=await r.json();if(!r.ok)throw Error(JSON.stringify(result));document.getElementById('status').textContent=result.result}catch(e){document.getElementById('status').textContent=e.message}finally{busy=false;refresh()}}
+document.getElementById('save').onclick=async()=>{if(busy)return;busy=true;try{const r=await fetch('/api/checkpoint',{method:'POST'});document.getElementById('status').textContent=JSON.stringify(await r.json())}finally{busy=false}};
+setInterval(()=>{if(!busy)document.getElementById('screen').src='/screen.png?t='+Date.now()},1000);setInterval(refresh,4000);refresh();document.getElementById('screen').src='/screen.png';
+</script></html>
