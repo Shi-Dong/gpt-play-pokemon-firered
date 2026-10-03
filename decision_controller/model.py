@@ -57,7 +57,7 @@ def request_body(state: dict[str, Any], options: Sequence[dict[str, Any]], model
             guidance = "Your starter is already obtained. Leave Oak's lab through the south exit to PALLET_TOWN. Do not talk to Oak again or inspect the remaining starter balls."
         elif location == "PALLET_TOWN":
             guidance = "Travel north out of Pallet Town to ROUTE_1, then continue north to VIRIDIAN_CITY and enter its POKEMON_MART to collect Oak's Parcel. Do not enter Oak's lab or your house."
-        elif location == "ROUTE_1":
+        elif location.replace("_", "") == "ROUTE1":
             guidance = "Cross Route 1 northward to VIRIDIAN_CITY. The south exit returns to Pallet Town; avoid it while collecting the parcel."
         elif location == "VIRIDIAN_CITY":
             guidance = "Enter VIRIDIAN_CITY_POKEMON_MART and talk to the shop clerk to receive Oak's Parcel."

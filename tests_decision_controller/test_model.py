@@ -75,6 +75,7 @@ def test_parcel_route_guidance_avoids_lab_reentry() -> None:
         ("PALLET_TOWN_PROFESSOR_OAKS_LAB", "Leave Oak's lab"),
         ("PALLET_TOWN", "Do not enter Oak's lab"),
         ("ROUTE_1", "Cross Route 1 northward"),
+        ("ROUTE1", "Cross Route 1 northward"),
         ("VIRIDIAN_CITY", "Enter VIRIDIAN_CITY_POKEMON_MART"),
         ("VIRIDIAN_CITY_POKEMON_MART", "shop clerk")]:
         body = request_body(
