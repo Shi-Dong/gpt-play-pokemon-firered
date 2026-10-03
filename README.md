@@ -348,3 +348,6 @@ tap leaves the same dialogue unchanged, it retries once with a 15-frame A press.
 It stops on a new page or menu; unchanged dialogue is reported as blocked and
 remains subject to the loop detector. No save reset or automatic choice selection
 is used to recover from a loop.
+
+Starter-selection guidance targets the lab's ITEM_BALL objects and avoids
+repeating Oak/rival conversations after arriving at the laboratory.

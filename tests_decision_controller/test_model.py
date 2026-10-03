@@ -56,3 +56,15 @@ def test_endpoint_request_and_output(tmp_path: Path) -> None:
     logged = json.loads((tmp_path / "calls.jsonl").read_text())
     assert logged["raw_response"] == Response.text
     assert "authorization" not in logged
+
+
+def test_lab_starter_guidance_targets_poke_balls() -> None:
+    body = request_body(
+        {"location":{"name":"PALLET_TOWN_PROFESSOR_OAKS_LAB"},
+         "memory":{"next_goal":{"id":"starter"}}},
+        [{"label":"AA","id":"interact:8:4","description":"Interact with ITEM_BALL"}],
+        "model")
+    prompt = body["messages"][0]["content"]
+    assert "ITEM_BALL" in prompt
+    assert "Do not keep talking to PROF_OAK" in prompt
+    assert '"AA"' in prompt
