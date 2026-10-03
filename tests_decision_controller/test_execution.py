@@ -32,3 +32,17 @@ def test_naming_finish_and_menu_selected_flags(tmp_path: Path) -> None:
     executor = Executor(bridge, Memory(tmp_path / "other.json"))
     result = executor.execute("menu:startMenu:1", original.fingerprint)
     assert result["ok"] and bridge.commands == ["down", "a"]
+
+
+def test_directional_stairs_label_and_unknown_exit_frontier() -> None:
+    original = state([[0]*6,[0,1,1,30,0,0],[0,1,1,1,1,0],[0,None,None,None,None,0],[0]*6])
+    original.raw["map"]["fullMap"]["warp_events"] = [
+        {"position":[2,1],"destMapName":"UPSTAIRS"},
+        {"position":[2,3],"destMapName":"OUTSIDE"}]
+    offered = choices(original)
+    stairs = next(choice for choice in offered if choice.id == "travel:3:1")
+    assert "UPSTAIRS" in stairs.description
+    approach = next(choice for choice in offered if choice.id == "approach:2:3")
+    assert "OUTSIDE" in approach.description
+    assert approach.target is not None
+    assert original.raw["map"]["fullMap"]["minimap_data"]["grid"][approach.target[1]][approach.target[0]] is not None

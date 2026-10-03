@@ -154,10 +154,27 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
             elif target in paths and target != state.position:
                 if code in PORTALS | FORCED:
                     warp = warps.get(target, {})
+                    if not warp:
+                        # The bridge renders directional stair/door tiles one
+                        # cell away from the native warp-event approach square.
+                        adjacent = [(pos, event) for pos, event in warps.items()
+                                    if abs(pos[0] - x) + abs(pos[1] - y) == 1]
+                        if len(adjacent) == 1:
+                            warp = adjacent[0][1]
                     destination = warp.get("destMapName", "next area")
                     candidates.append((len(paths[target]), Choice(f"travel:{x}:{y}", f"Enter {destination} via ({x},{y})", "travel", target=target)))
                 elif any(0 <= x + dx < width and 0 <= y + dy < height and nav.code((x + dx, y + dy)) is None for dx, dy in DIRECTIONS.values()):
                     candidates.append((len(paths[target]) + 10, Choice(f"explore:{x}:{y}", f"Explore undiscovered terrain near ({x},{y})", "travel", target=target)))
+    frontiers = [pos for pos in paths if pos != state.position and nav.code(pos) not in PORTALS | FORCED and
+                 any(0 <= pos[0] + dx < width and 0 <= pos[1] + dy < height and
+                     nav.code((pos[0] + dx, pos[1] + dy)) is None for dx, dy in DIRECTIONS.values())]
+    for target, warp in warps.items():
+        if target in paths or not frontiers:
+            continue
+        frontier = min(frontiers, key=lambda pos: (abs(pos[0]-target[0]) + abs(pos[1]-target[1]), len(paths[pos])))
+        candidates.append((len(paths[frontier]), Choice(f"approach:{target[0]}:{target[1]}",
+                          f'Approach exit to {warp.get("destMapName", "next area")} at {target}; reveal terrain from {frontier}',
+                          "travel", target=frontier)))
     basic = [Choice(f"step:{edge.command}", f"Move one tile {edge.command}", "step", (edge.command,), edge.destination) for edge in nav.edges(state.position)]
     basic.extend([Choice("interact:front", "Interact with the object directly ahead", commands=("a",)),
                    Choice("open:start", "Open the game menu (party, bag, save)", commands=("start",))])
