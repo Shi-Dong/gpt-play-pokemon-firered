@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -59,8 +60,8 @@ def item_names(value: Any) -> set[str]:
 
 def atomic_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    with temporary.open("w") as output:
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=path.name + ".", suffix=".tmp", delete=False) as output:
+        temporary = Path(output.name)
         json.dump(value, output, ensure_ascii=False, indent=2)
         output.flush()
         os.fsync(output.fileno())

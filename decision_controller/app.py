@@ -1,7 +1,9 @@
-"""Separate staging viewer and manual choice API. No inference is started."""
+"""Separate live viewer, guarded choice API and autonomous controller controls."""
 
 import hashlib
+import json
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,11 @@ class Arguments(Tap):
 class Selection(BaseModel):
     choice_id: str
     fingerprint: str
+    automatic: bool = False
+
+
+class Control(BaseModel):
+    enabled: bool
 
 
 def create_app(bridge: Bridge, runtime: Path) -> FastAPI:
@@ -36,7 +43,27 @@ def create_app(bridge: Bridge, runtime: Path) -> FastAPI:
     memory = Memory(runtime / "memory.json")
     executor = Executor(bridge, memory)
     lock = threading.RLock()
+    screenshot_lock = threading.Lock()
     app = FastAPI(title="FireRed decision controller staging")
+
+    def controller_status() -> dict[str, Any]:
+        try:
+            status = json.loads((runtime / "controller.json").read_text())
+            control = json.loads((runtime / "control.json").read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {"model_connected": False, "autoplay": False, "phase": "manual"}
+        status["autoplay"] = control.get("enabled", False)
+        status["heartbeat_age_seconds"] = round(time.time() - status.get("updated_at", 0), 1)
+        return status
+
+    @app.get("/api/controller")
+    def controller() -> dict[str, Any]:
+        return controller_status()
+
+    @app.post("/api/control")
+    def control(body: Control) -> dict[str, Any]:
+        atomic_json(runtime / "control.json", {"enabled": body.enabled, "revision": time.time_ns()})
+        return {"ok": True, "enabled": body.enabled}
 
     @app.middleware("http")
     async def origin_check(request: Request, call_next: Any) -> Any:
@@ -55,13 +82,16 @@ def create_app(bridge: Bridge, runtime: Path) -> FastAPI:
         with lock:
             current = bridge.state()
             memory.observe(current)
-            return {"model_connected": False, "autoplay": False, "fingerprint": current.fingerprint,
+            status = controller_status()
+            return {"model_connected": status["model_connected"], "autoplay": status["autoplay"], "fingerprint": current.fingerprint,
                     "state": current.model_state(memory.public()),
                     "options": [choice.public(index) for index, choice in enumerate(choices(current, memory.data))]}
 
     @app.post("/api/execute")
     def execute(selection: Selection) -> dict[str, Any]:
         with lock:
+            if controller_status().get("autoplay") and not selection.automatic:
+                raise HTTPException(409, "Pause autonomous play before manual input")
             try:
                 result = executor.execute(selection.choice_id, selection.fingerprint)
             except ValueError as error:
@@ -74,7 +104,9 @@ def create_app(bridge: Bridge, runtime: Path) -> FastAPI:
 
     @app.get("/screen.png")
     def screen() -> FileResponse:
-        with lock:
+        # Screenshot requests have no game input. Separate locking keeps frames
+        # visible while a bounded local route is executing.
+        with screenshot_lock:
             destination = runtime / "screen.new.png"
             result = mgba_screenshot(str(destination.resolve()))
             if not result.get("ok") or not destination.exists():
@@ -104,6 +136,11 @@ def create_app(bridge: Bridge, runtime: Path) -> FastAPI:
                         "fingerprint": current.fingerprint, "memory": memory.data}
             atomic_json(runtime / f"checkpoint-{generation}.json", manifest)
             atomic_json(runtime / "latest-checkpoint.json", manifest)
+            # Bound storage growth without overwriting a valid checkpoint.
+            manifests = sorted(runtime.glob("checkpoint-*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
+            for old in manifests[20:]:
+                old.with_suffix(".ss0").unlink(missing_ok=True)
+                old.unlink(missing_ok=True)
             return {"ok": True, "checkpoint": path.name}
 
     return app

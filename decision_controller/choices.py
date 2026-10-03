@@ -62,6 +62,14 @@ def menu_commands(menu: dict[str, Any], index: int) -> tuple[str, ...]:
 
 
 def menu_choices(state: State) -> list[Choice]:
+    if state.mode == "namingScreen":
+        naming = mapping(state.dialog.get("choiceMenu"))
+        cursor = mapping(naming.get("cursor"))
+        return [Choice("naming:finish", f'Finish naming with current text {naming.get("text", "")!r} (default name if empty)', "naming_finish"),
+                Choice("naming:type", f'Type highlighted character {cursor.get("selected", "")!r}', commands=("a",)),
+                *[Choice(f"cursor:{key}", f"Move keyboard cursor {key}", commands=(key,)) for key in DIRECTIONS],
+                Choice("naming:delete", "Delete last character", commands=("b",)),
+                Choice("wait", "Wait for naming animation", "wait")]
     menu = menu_payload(state)
     options = menu.get("options", [])
     result = []
@@ -150,16 +158,19 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
                     candidates.append((len(paths[target]), Choice(f"travel:{x}:{y}", f"Enter {destination} via ({x},{y})", "travel", target=target)))
                 elif any(0 <= x + dx < width and 0 <= y + dy < height and nav.code((x + dx, y + dy)) is None for dx, dy in DIRECTIONS.values()):
                     candidates.append((len(paths[target]) + 10, Choice(f"explore:{x}:{y}", f"Explore undiscovered terrain near ({x},{y})", "travel", target=target)))
-    result = [Choice(f"step:{edge.command}", f"Move one tile {edge.command}", "step", (edge.command,), edge.destination) for edge in nav.edges(state.position)]
-    result.extend([Choice("interact:front", "Interact with the object directly ahead", commands=("a",)),
+    basic = [Choice(f"step:{edge.command}", f"Move one tile {edge.command}", "step", (edge.command,), edge.destination) for edge in nav.edges(state.position)]
+    basic.extend([Choice("interact:front", "Interact with the object directly ahead", commands=("a",)),
                    Choice("open:start", "Open the game menu (party, bag, save)", commands=("start",))])
+    result: list[Choice] = []
     seen: set[str] = set()
     visits = (memory or {}).get("targets", {})
     for _, choice in sorted(candidates, key=lambda item: item[0] + 8 * visits.get(f"{state.map_id}:{item[1].id}", 0)):
         if choice.id not in seen:
             result.append(choice)
             seen.add(choice.id)
-        if len(result) >= 25:
+        if len(result) >= 25 - len(basic):
             break
+    # Named destinations and interactions precede cursor-sized movement choices.
+    result.extend(basic)
     result.append(Choice("wait", "Wait for the game to settle", "wait"))
     return result

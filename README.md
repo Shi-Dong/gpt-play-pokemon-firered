@@ -325,10 +325,11 @@ This project is licensed under **Creative Commons Attribution-NonCommercial 4.0 
 See [LICENSE](LICENSE) for details.
 
 
-## Model-independent probability controller staging
+## Probability controller and live viewer
 
-A separate preparation path now provides an isolated emulator/viewer, structured
-state, executable choices, deterministic navigation and persistent story memory
-without starting inference. See [the controller setup and validation notes](decision_controller/README.md).
+A separate controller provides an isolated emulator/viewer, structured state,
+executable choices, deterministic navigation and persistent story memory. Its
+optional autonomous worker uses a probability-JSON endpoint with thinking disabled
+and displays call timing, selected probabilities, pause/resume and checkpoints. See [the controller setup and validation notes](decision_controller/README.md).
 The staging viewer can coexist with another running Pokémon adventure.
 Full-game completion with this controller has not yet been demonstrated.

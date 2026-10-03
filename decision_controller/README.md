@@ -1,8 +1,8 @@
-# FireRed probability-controller preparation
+# FireRed probability controller
 
-This is a **model-independent staging controller**, separate from the upstream
-OpenAI agent. It does not contact an inference endpoint. The current adventure
-can be tested manually before a probability-JSON adapter is connected.
+This controller is separate from the upstream OpenAI agent. Its optional
+autonomous worker connects an OpenAI-compatible probability-JSON endpoint.
+Without that worker, the viewer supports manual testing of the current adventure.
 
 ## What is implemented
 
@@ -21,8 +21,15 @@ can be tested manually before a probability-JSON adapter is connected.
   battle, dialogue or map transition. Reject stale snapshots and unknown IDs.
 - Evidence-based story goals, all eight badges, required key items, Elite Four,
   Champion and Hall of Fame; atomic memory, visit counts and recent failures.
-- Manual checkpoint pairs containing ROM identity, savestate hash and memory.
+- Checkpoint pairs containing ROM identity, savestate hash and memory.
   Existing memory cannot silently start a new game; use explicit `--resume`.
+- Fresh user-only State/Options model requests with A–Z labels and thinking
+  disabled. Reject malformed, duplicate, missing, extra, nonnumeric, nonfinite,
+  out-of-range or all-zero probability weights, reasoning and truncated output.
+  Normalize positive totals while logging the raw total and response; select
+  the highest probability without substituting a scripted strategic answer.
+- Autonomous play, live call timing, pause/resume, stale-response rejection,
+  bounded retries, checkpoints and progress-preserving stops.
 
 ## Install and launch
 
@@ -62,9 +69,40 @@ loopback; only the staging viewer binds to the specified host. Bind the viewer
 to a Tailnet address to view it from another Tailnet machine. Keep the launcher
 inside a persistent tmux session. It manages only the processes it starts.
 
+After the viewer is ready, run its worker in another persistent tmux session:
+
+```fish
+.venv/bin/python -m decision_controller.autoplay \
+    --viewer-url http://100.64.0.10:8788 \
+    --endpoint http://your-inference-server:30000/v1/chat/completions \
+    --model your-trained-model \
+    --runtime /absolute/path/to/repository/.runtime \
+    --autoplay
+```
+
+Use the same runtime directory for the launcher and worker. `--autoplay` is an
+explicit startup instruction; omit it to start paused. The endpoint must return
+a JSON object assigning every offered letter a probability. The worker sends
+`chat_template_kwargs: {"enable_thinking": false}`, temperature zero and one
+user message, without tool calls or accumulated conversation. It requests every
+decision afresh. No application answer cache is used.
+
+The viewer shows the latest HTTP model-call duration in milliseconds and seconds,
+the elapsed time of a pending call, selected action and probabilities. This is
+client-observed HTTP latency, including transport and server processing; it is
+not a GPU-only measurement or time to first token. Button execution and saving
+are excluded. Raw requests/responses are written to `model-calls.jsonl` inside
+the ignored runtime directory. A changing game state or pause/resume instruction
+during inference discards the eventual action. A route executes at most eight
+movement steps before returning to the model; each step is re-observed.
+
 ## APIs
 
 - `GET /api/state`: structured state, fingerprint and labeled options.
+- `GET /api/controller`: phase, call timing, latest choice, error and heartbeat.
+- `POST /api/control`: `{"enabled":false}` pauses; `true` resumes the worker.
+  Pause cancels pending inference; an already executing bounded local action
+  finishes before the next model decision. Manual inputs require paused play.
 - `POST /api/execute`: `{"choice_id":"…","fingerprint":"…"}`. Returns 409
   on a stale snapshot. Fetch fresh state and choose again.
 - `GET /screen.png`: current native framebuffer.
@@ -82,6 +120,11 @@ decoders, so retaining decoded text can hide an intro/menu change.
 After a successful checkpoint, restart with the same arguments plus `--resume`.
 This verifies the checkpoint and restores the associated memory and emulator
 state together. No automatic resets, rollback or adventure repetition exist.
+The worker attempts a checkpoint after each executed decision at a stable
+boundary and on graceful shutdown. The newest 20 pairs are retained. Three
+consecutive request/protocol errors or repeated unchanged state/action pause
+the worker and expose the error. Resume retries the existing adventure. Hall
+of Fame evidence stops autonomous play; defeating an arbitrary trainer does not.
 
 ## Validation scope and remaining work
 
@@ -102,10 +145,11 @@ push choices, not a proven puzzle solver. Silph teleporters and Rocket spinners
 are observed transitions, not precomputed solutions. These are material limits
 when assessing readiness for unattended end-to-end play.
 
-The next phase is the SGLang probability-JSON adapter, exact trained prompt
-format, response validation, caching/latency instrumentation, autonomous loop
-and staged real-game acceptance runs. No model or current viewer is changed by
-this preparation.
+Protocol tests also exercise the actual endpoint request body and raw response
+consumer, normalization, paused-call cancellation, stale-call discard and
+unchanged-action stops. Native staged acceptance with a trained SGLang endpoint
+has verified introductory dialogue, name selection and browser pause/resume.
+Starter/rival, Brock and later-game mechanics still require real-game acceptance.
 
 Upstream game decoding and Lua bridge remain credited to
 [Clad3815/gpt-play-pokemon-firered](https://github.com/Clad3815/gpt-play-pokemon-firered)

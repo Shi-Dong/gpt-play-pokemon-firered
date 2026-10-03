@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from decision_controller.choices import Choice, choices, menu_commands, menu_cursor, menu_payload
+from decision_controller.choices import Choice, choices, menu_commands, menu_cursor, menu_payload, option_name
 from decision_controller.memory import Memory
 from decision_controller.navigation import Navigator
 from decision_controller.state import State, mapping
@@ -61,6 +61,17 @@ class Executor:
             return self.bridge.state(), "waited", 0
         if choice.kind == "menu":
             return self.select_menu(before, choice)
+        if choice.kind == "naming_finish":
+            self.bridge.command("start")
+            current = self.bridge.state()
+            if current.mode != "namingScreen":
+                return current, "interrupted", 1
+            cursor = mapping(mapping(current.dialog.get("choiceMenu")).get("cursor"))
+            if str(cursor.get("selected", "")).upper() != "OK":
+                return current, "blocked", 1
+            self.bridge.command("a")
+            after = self.bridge.state()
+            return after, "selected" if after.fingerprint != current.fingerprint else "blocked", 2
         if choice.kind in {"travel", "interact", "push", "exit"}:
             return self.travel(before, choice)
         current = before
@@ -78,11 +89,11 @@ class Executor:
 
     def select_menu(self, before: State, choice: Choice) -> tuple[State, str, int]:
         current = before
-        original_options = menu_payload(before).get("options")
+        original_options = [option_name(option) for option in menu_payload(before).get("options", [])]
         count = 0
         for _ in range(24):
             menu = menu_payload(current)
-            if current.mode != before.mode or menu.get("options") != original_options:
+            if current.mode != before.mode or [option_name(option) for option in menu.get("options", [])] != original_options:
                 return current, "interrupted", count
             index = choice.menu_index
             if index is None:
@@ -105,7 +116,7 @@ class Executor:
         count = 0
         if choice.target is None:
             raise ValueError("Missing route target")
-        for _ in range(80):
+        for _ in range(8):
             if current.map_id != before.map_id or current.mode != "overworld":
                 return current, "interrupted", count
             nav = Navigator(current)
