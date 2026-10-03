@@ -331,5 +331,7 @@ A separate controller provides an isolated emulator/viewer, structured state,
 executable choices, deterministic navigation and persistent story memory. Its
 optional autonomous worker uses a probability-JSON endpoint with thinking disabled
 and displays call timing, selected probabilities, pause/resume and checkpoints. See [the controller setup and validation notes](decision_controller/README.md).
-The staging viewer can coexist with another running Pokémon adventure.
+The staging viewer can coexist with another running Pokémon adventure. Its responsive
+dashboard presents a pixel-sharp game screen, current objective, model action and
+full-response latency, with pause/resume controls and expandable diagnostics.
 Full-game completion with this controller has not yet been demonstrated.

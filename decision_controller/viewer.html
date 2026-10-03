@@ -1,13 +1,82 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FireRed live gameplay</title>
-<style>body{background:#111827;color:#e5e7eb;font:16px system-ui;max-width:1100px;margin:24px auto;padding:16px}img{width:480px;max-width:100%;image-rendering:pixelated;border:2px solid #475569}button{background:#1e293b;color:#eee;border:1px solid #64748b;padding:10px;margin:6px;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#1e293b;padding:14px}#status,#latency{color:#fbbf24}.columns{display:flex;gap:24px;flex-wrap:wrap}#options button{display:block}#latency{font-size:22px}</style>
-<h1>FireRed live gameplay</h1><p id="status">Connecting…</p>
-<p id="latency">Model call: awaiting first response</p><p id="decision"></p><p id="error"></p>
-<button id="pause">Pause</button><button id="resume">Resume autonomous play</button><button id="save">Save checkpoint</button>
-<div class="columns"><div><img id="screen" alt="Live FireRed framebuffer"><p id="location"></p><p id="goal"></p></div><div id="options"></div></div>
-<details><summary>Model probabilities and timing</summary><pre id="metrics"></pre></details>
-<details><summary>Structured game state</summary><pre id="details"></pre></details>
+<title>FireRed · Live adventure</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1118;--panel:#161c26;--line:#293241;--text:#edf1f7;--muted:#98a5ba;--accent:#ff685c}
+
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 15% 0%,#302027 0,transparent 45%),var(--bg);color:var(--text);font:14px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:1440px;margin:auto;padding:36px 40px}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:30px}
+.brand{display:flex;align-items:center;gap:16px}
+.ball{width:42px;height:42px;border-radius:50%;background:linear-gradient(var(--accent) 0 46%,#10151e 46% 55%,#edf1f7 55%);border:3px solid #edf1f7;position:relative;flex-shrink:0}
+.ball:after{content:"";position:absolute;width:13px;height:13px;left:11px;top:11px;border:3px solid #10151e;background:#edf1f7;border-radius:50%}
+h1{font-size:26px;letter-spacing:-.8px;margin:0;line-height:1.25}
+.eyebrow{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:2px;font-weight:700;margin:0 0 7px}
+.subtitle{margin:5px 0 0;color:var(--muted);font-size:12px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;background:#202938;color:var(--text);border:1px solid #354154;border-radius:9px;padding:10px 14px;cursor:pointer;transition:background .15s,border-color .15s}
+button:hover:enabled{background:#2c384b;border-color:#6b7c96}
+button:focus-visible,summary:focus-visible{outline:2px solid #ff9a77;outline-offset:3px}
+button:disabled{opacity:.45;cursor:default}
+#resume{background:var(--accent);border-color:var(--accent);color:#180e0c;font-weight:700}
+#resume:hover:enabled{background:#ff8b79}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.stat,.panel,details{min-width:0;overflow-wrap:anywhere;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.stat{padding:18px 22px;min-height:98px}
+#status{margin:0;font-size:14px}
+#latency{margin:0;font-size:21px;font-weight:650;letter-spacing:-.5px;color:#f5c486}
+.columns{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:22px;align-items:start}
+.panel-heading{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.panel-heading h2{font-size:14px;margin:0;font-weight:600}
+.tag{font-size:10px;letter-spacing:1px;color:#a8b5c8;border:1px solid #394357;border-radius:5px;padding:2px 7px}
+.screen-wrap{padding:24px;background:#090d13;display:flex;align-items:center;justify-content:center;min-height:240px}
+#screen{display:block;width:100%;max-width:720px;height:auto;aspect-ratio:3/2;object-fit:contain;image-rendering:pixelated;border-radius:4px;box-shadow:0 8px 35px #0006}
+.game-info{padding:20px 22px}
+#location{font-size:17px;font-weight:600;margin:0 0 12px}
+#goal{margin:0;color:var(--muted)}
+.decision-card{padding:20px 22px;border-bottom:1px solid var(--line)}
+#decision{margin:0;font-size:15px;color:#edf1f7;min-height:24px}
+.helper{font-size:12px;color:var(--muted);margin:12px 0 0}
+#options{padding:14px;max-height:440px;overflow:auto;display:grid;gap:7px}
+#options button{display:block;width:100%;text-align:left;font-size:12px;line-height:1.5;padding:10px 12px;background:#1c2532}
+#options button:disabled{opacity:.7}
+.debug{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
+details{overflow:hidden}
+summary{padding:15px 20px;cursor:pointer;color:var(--muted);font-size:12px}
+details[open] summary{border-bottom:1px solid var(--line)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 ui-monospace,monospace;padding:0 20px;max-height:350px;overflow:auto;color:#b9c7da}
+#error:empty{display:none}
+#error{padding:14px 18px;background:#352221;border:1px solid #6f3934;border-radius:10px;color:#ffc0a9;overflow-wrap:anywhere;margin:0 0 18px}
+footer{margin-top:24px;color:#697990;font-size:11px;display:flex;justify-content:space-between;gap:12px}
+
+@media(min-width:1100px){.screen-wrap{min-height:420px}
+}
+@media(max-width:850px){main{padding:24px 18px}
+header{align-items:flex-start;flex-direction:column}
+.columns{grid-template-columns:minmax(0,1fr)}
+.stats{grid-template-columns:1fr 1fr}
+#options{max-height:300px}
+.debug{grid-template-columns:1fr}
+#latency{font-size:17px}
+}
+@media(max-width:480px){.stats{grid-template-columns:1fr}
+h1{font-size:23px}
+.screen-wrap{padding:12px}
+.controls button{font-size:12px;padding:9px 12px}
+}
+
+</style>
+<main>
+<header><div class="brand"><div class="ball" aria-hidden="true"></div><div><p class="eyebrow">Autonomous adventure</p><h1>Pokémon FireRed</h1><p class="subtitle">Live gameplay · SGLang decision model</p></div></div><div class="controls"><button id="pause">Pause</button><button id="resume">Resume play</button><button id="save">Save checkpoint</button></div></header>
+<div class="stats"><section class="stat"><p class="eyebrow">Controller</p><p id="status" role="status">Connecting…</p></section><section class="stat"><p class="eyebrow">Response latency</p><p id="latency">Awaiting first response</p></section></div>
+<p id="error" role="alert"></p>
+<div class="columns"><section class="panel"><div class="panel-heading"><h2>Game screen</h2><span class="tag">LIVE · GBA</span></div><div class="screen-wrap"><img id="screen" width="240" height="160" alt="Live FireRed gameplay"></div><div class="game-info"><p class="eyebrow">Current location</p><p id="location">Loading adventure…</p><p class="eyebrow">Next objective</p><p id="goal"></p></div></section>
+<aside class="panel"><div class="panel-heading"><h2>Decision desk</h2><span class="tag">MODEL POLICY</span></div><div class="decision-card"><p class="eyebrow">Latest action</p><p id="decision">Waiting for a decision…</p><p class="helper">Pause autonomous play to select an action manually.</p></div><div id="options"></div></aside></div>
+<div class="debug"><details><summary>Model probabilities &amp; timing</summary><pre id="metrics"></pre></details><details><summary>Structured game state</summary><pre id="details"></pre></details></div>
+<footer><span>FireRed / Live adventure console</span><span>Game screen refreshes every second</span></footer>
+</main>
 <script>
 let snapshot=null,busy=false,controller={},refreshing=false,imagePending=false;
 const el=id=>document.getElementById(id);
