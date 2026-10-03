@@ -335,3 +335,16 @@ The staging viewer can coexist with another running Pokémon adventure. Its resp
 dashboard presents a pixel-sharp game screen, current objective, model action and
 full-response latency, with pause/resume controls and expandable diagnostics.
 Full-game completion with this controller has not yet been demonstrated.
+
+### Choice coverage and dialogue input
+
+All generated legal choices are offered; there is no 26-option cutoff. Labels
+continue from A-Z to AA, AB, and beyond. Menu selection budgets scale with the
+actual menu length, and all reachable map-connection entrances are retained.
+Larger choice lists require longer probability JSON responses from the model.
+
+Dialogue advancement checks for observed progress after each A press. If a short
+tap leaves the same dialogue unchanged, it retries once with a 15-frame A press.
+It stops on a new page or menu; unchanged dialogue is reported as blocked and
+remains subject to the loop detector. No save reset or automatic choice selection
+is used to recover from a loop.

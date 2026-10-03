@@ -18,8 +18,19 @@ class Choice:
     menu_index: int | None = None
 
     def public(self, index: int) -> dict[str, Any]:
-        return {"label": chr(65 + index), **asdict(self)}
+        return {"label": option_label(index), **asdict(self)}
 
+
+def option_label(index: int) -> str:
+    """Spreadsheet-style labels preserve A-Z and extend to AA, AB, ..."""
+    if index < 0:
+        raise ValueError("Choice index must be nonnegative")
+    value = index + 1
+    label = ""
+    while value:
+        value, remainder = divmod(value - 1, 26)
+        label = chr(65 + remainder) + label
+    return label
 
 def menu_payload(state: State) -> dict[str, Any]:
     dialog = state.dialog
@@ -73,7 +84,7 @@ def menu_choices(state: State) -> list[Choice]:
     menu = menu_payload(state)
     options = menu.get("options", [])
     result = []
-    for index, option in enumerate(options[:22]):
+    for index, option in enumerate(options):
         name = option_name(option)
         if not name or name.upper() in {"NONE", "-", "---"}:
             continue
@@ -90,7 +101,7 @@ def menu_choices(state: State) -> list[Choice]:
     if result:
         return result + [Choice("menu:cancel", "Cancel / return", commands=("b",)), Choice("wait", "Wait for the game to settle", "wait")]
     if state.mode in {"dialog", "battle", "locked", "questLogPlayback", "pikachuIntro"}:
-        return [Choice("continue", "Advance the displayed dialogue", commands=("a",)), Choice("wait", "Wait for animation / scripted movement", "wait")]
+        return [Choice("continue", "Advance the displayed dialogue", "dialog_advance", commands=("a",)), Choice("wait", "Wait for animation / scripted movement", "wait")]
     # Complex screens (naming, bag pockets, PC grids, Fly map, quantity chooser)
     # expose their decoded state and bounded cursor steps. No guessed item IDs.
     result = [Choice(f"cursor:{key}", f"Move {key} in {state.mode}", commands=(key,)) for key in DIRECTIONS]
@@ -129,9 +140,8 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
                     (direction == "down" and pos[1] == height - 1) or
                     (direction == "left" and pos[0] == 0) or
                     (direction == "right" and pos[0] == width - 1)]
-        # Present a few entrances; an offset/narrow connection can reject one
-        # boundary crossing, which is recorded rather than blindly retried.
-        for target in sorted(boundary, key=lambda pos: len(paths[pos]))[:3]:
+        # Present every reachable entrance; rejected crossings are recorded.
+        for target in sorted(boundary, key=lambda pos: len(paths[pos])):
             candidates.append((len(paths[target]), Choice(f"exit:{direction}:{target[0]}:{target[1]}",
                               f"Travel {direction} to {destination}", "exit", (direction,), target)))
         if not boundary and frontiers:
@@ -190,8 +200,6 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
         if choice.id not in seen:
             result.append(choice)
             seen.add(choice.id)
-        if len(result) >= 25 - len(basic):
-            break
     # Named destinations and interactions precede cursor-sized movement choices.
     result.extend(basic)
     # A settled, unlocked overworld has no pending animation to wait for.

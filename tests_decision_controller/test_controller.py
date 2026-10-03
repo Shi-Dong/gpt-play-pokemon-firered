@@ -24,12 +24,12 @@ class FakeBridge:
     def __init__(self, initial: State, updates: list[State] | None = None) -> None:
         self.current = initial
         self.updates = list(updates or [])
-        self.commands: list[str] = []
+        self.commands: list[str | dict[str, object]] = []
 
     def state(self) -> State:
         return self.current
 
-    def command(self, command: str) -> dict[str, bool]:
+    def command(self, command: str | dict[str, object]) -> dict[str, bool]:
         # Validate the generated payload with the real downstream bridge schema.
         assert SendCommandsBody.model_validate({"commands": [command]}).commands == [command]
         self.commands.append(command)
@@ -126,12 +126,16 @@ def test_moving_npc_aborts_before_interaction(tmp_path: Path) -> None:
     assert result == "target_moved" and count == 1 and bridge.commands == ["right"]
 
 
-def test_choice_count_and_public_labels_are_bounded() -> None:
+def test_all_overworld_choices_are_offered_with_extended_labels() -> None:
     original = state([[1]*40 for _ in range(10)])
     original.raw["map"]["fullMap"]["minimap_data"]["grid"][2] = [None]*40
     offered = choices(original)
-    assert len(offered) <= 26
-    assert [choice.public(index)["label"] for index, choice in enumerate(offered)] == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[:len(offered)])
+    assert len(offered) > 26
+    labels = [choice.public(index)["label"] for index, choice in enumerate(offered)]
+    assert labels[:26] == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    assert labels[26:28] == ["AA", "AB"]
+    assert len(labels) == len(set(labels))
+    assert "explore:39:1" in {choice.id for choice in offered}
 
 
 def test_stale_and_unknown_choices_do_not_press_buttons(tmp_path: Path) -> None:

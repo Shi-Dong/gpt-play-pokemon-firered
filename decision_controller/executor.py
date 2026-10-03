@@ -22,7 +22,7 @@ class Bridge:
         response.raise_for_status()
         return State.from_bridge(response.json())
 
-    def command(self, command: str) -> dict[str, Any]:
+    def command(self, command: str | dict[str, Any]) -> dict[str, Any]:
         response = self.session.post(f"{self.url}/sendCommands", json={"commands": [command]}, timeout=90)
         response.raise_for_status()
         payload = response.json()
@@ -59,6 +59,8 @@ class Executor:
         if choice.kind == "wait":
             self.sleep(0.25)
             return self.bridge.state(), "waited", 0
+        if choice.kind == "dialog_advance":
+            return self.advance_dialog(before)
         if choice.kind == "menu":
             return self.select_menu(before, choice)
         if choice.kind == "naming_finish":
@@ -87,11 +89,28 @@ class Executor:
                 return current, "blocked", count
         return current, "executed", count
 
+    def advance_dialog(self, before: State) -> tuple[State, str, int]:
+        # Short taps can be missed while the text printer changes state. Observe
+        # first; retry only an unchanged dialogue, never a newly exposed choice.
+        self.bridge.command("a")
+        current = self.bridge.state()
+        if current.fingerprint != before.fingerprint:
+            return current, "advanced", 1
+        if current.mode != "dialog":
+            return current, "blocked", 1
+        self.sleep(0.15)
+        current = self.bridge.state()
+        if current.fingerprint != before.fingerprint:
+            return current, "advanced", 1
+        self.bridge.command({"type": "hold", "button": "A", "frames": 15})
+        after = self.bridge.state()
+        return after, "advanced" if after.fingerprint != current.fingerprint else "blocked", 2
+
     def select_menu(self, before: State, choice: Choice) -> tuple[State, str, int]:
         current = before
         original_options = [option_name(option) for option in menu_payload(before).get("options", [])]
         count = 0
-        for _ in range(24):
+        for _ in range(len(original_options) + 1):
             menu = menu_payload(current)
             if current.mode != before.mode or [option_name(option) for option in menu.get("options", [])] != original_options:
                 return current, "interrupted", count
