@@ -351,3 +351,8 @@ is used to recover from a loop.
 
 Starter-selection guidance targets the lab's ITEM_BALL objects and avoids
 repeating Oak/rival conversations after arriving at the laboratory.
+
+Parcel routing guidance distinguishes leaving the lab, crossing Pallet Town and
+Route 1 northward, and entering Viridian Mart. After map transitions the prompt
+warns about immediately re-entering the doorway just used; model choices remain
+unrestricted.

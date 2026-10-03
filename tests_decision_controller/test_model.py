@@ -68,3 +68,19 @@ def test_lab_starter_guidance_targets_poke_balls() -> None:
     assert "ITEM_BALL" in prompt
     assert "Do not keep talking to PROF_OAK" in prompt
     assert '"AA"' in prompt
+
+
+def test_parcel_route_guidance_avoids_lab_reentry() -> None:
+    for location, expected in [
+        ("PALLET_TOWN_PROFESSOR_OAKS_LAB", "Leave Oak's lab"),
+        ("PALLET_TOWN", "Do not enter Oak's lab"),
+        ("ROUTE_1", "Cross Route 1 northward"),
+        ("VIRIDIAN_CITY", "Enter VIRIDIAN_CITY_POKEMON_MART"),
+        ("VIRIDIAN_CITY_POKEMON_MART", "shop clerk")]:
+        body = request_body(
+            {"location":{"name":location},"memory":{"next_goal":{"id":"parcel"},
+             "recent_actions":[{"map":"4:3","after_map":"3:0"}]}},
+            [{"label":"A","id":"step:up","description":"Move up"}],"model")
+        prompt = body["messages"][0]["content"]
+        assert expected in prompt
+        assert "Move away from that doorway" in prompt

@@ -52,6 +52,20 @@ def request_body(state: dict[str, Any], options: Sequence[dict[str, Any]], model
                 guidance += " You are directly outside your house door. UP from (6,8) re-enters the house; it does not take you toward Route 1. First move LEFT, RIGHT or DOWN away from the door, then navigate around the house toward the north exit. Do not re-enter your house."
         elif "OAKS_LAB" in location:
             guidance = "Choose your starter: advance any displayed dialogue, then approach and interact with one of the ITEM_BALL objects (starter Poké Balls) on the laboratory table. Accept the Pokémon when asked. Do not keep talking to PROF_OAK or BLUE; those conversations repeat without choosing a starter."
+    if goal.get("id") == "parcel":
+        if "OAKS_LAB" in location:
+            guidance = "Your starter is already obtained. Leave Oak's lab through the south exit to PALLET_TOWN. Do not talk to Oak again or inspect the remaining starter balls."
+        elif location == "PALLET_TOWN":
+            guidance = "Travel north out of Pallet Town to ROUTE_1, then continue north to VIRIDIAN_CITY and enter its POKEMON_MART to collect Oak's Parcel. Do not enter Oak's lab or your house."
+        elif location == "ROUTE_1":
+            guidance = "Cross Route 1 northward to VIRIDIAN_CITY. The south exit returns to Pallet Town; avoid it while collecting the parcel."
+        elif location == "VIRIDIAN_CITY":
+            guidance = "Enter VIRIDIAN_CITY_POKEMON_MART and talk to the shop clerk to receive Oak's Parcel."
+        elif "VIRIDIAN" in location and "MART" in location:
+            guidance = "Talk to the shop clerk to collect Oak's Parcel."
+    recent = state.get("memory", {}).get("recent_actions", [])
+    if recent and recent[-1].get("map") != recent[-1].get("after_map"):
+        guidance += " You have just crossed a map entrance. The closest doorway may return to the map you just left. Move away from that doorway before continuing toward your objective."
     prompt += f"\n\nCurrent objective: {guidance}\nChoose an offered action that makes progress. Prefer a named destination over individual steps when it leads toward this objective. Avoid actions that just failed.\n\nOptions:\n"
     prompt += "\n".join(f'{option["label"]}. {option["id"]}: {option["description"]}' for option in options)
     prompt += "\n\nReport your probability for every option as a JSON object with exactly the keys "
