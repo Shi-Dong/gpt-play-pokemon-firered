@@ -47,7 +47,9 @@ def request_body(state: dict[str, Any], options: Sequence[dict[str, Any]], model
         elif "PLAYERS_HOUSE_1_F" in location:
             guidance = "Exit the player's house to PALLET_TOWN."
         elif location == "PALLET_TOWN":
-            guidance = "Walk north toward ROUTE_1 to trigger Oak stopping you and leading you to his lab."
+            guidance = "Reach ROUTE_1 at the north edge of Pallet Town to trigger Oak stopping you and leading you to his lab."
+            if state.get("location", {}).get("position") == [6, 8]:
+                guidance += " You are directly outside your house door. UP from (6,8) re-enters the house; it does not take you toward Route 1. First move LEFT, RIGHT or DOWN away from the door, then navigate around the house toward the north exit. Do not re-enter your house."
         elif "OAKS_LAB" in location:
             guidance = "Talk to Oak, then inspect a starter Poké Ball and accept the Pokémon."
     prompt += f"\n\nCurrent objective: {guidance}\nChoose an offered action that makes progress. Prefer a named destination over individual steps when it leads toward this objective. Avoid actions that just failed.\n\nOptions:\n"

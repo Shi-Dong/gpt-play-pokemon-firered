@@ -46,3 +46,13 @@ def test_directional_stairs_label_and_unknown_exit_frontier() -> None:
     assert "OUTSIDE" in approach.description
     assert approach.target is not None
     assert original.raw["map"]["fullMap"]["minimap_data"]["grid"][approach.target[1]][approach.target[0]] is not None
+
+
+def test_unknown_map_boundary_offers_named_exploration_without_idle_wait() -> None:
+    original = state([[0, None, None, 0],[0,1,1,0],[0,0,0,0]])
+    original.raw["map"]["connections"] = [{"direction":"up", "mapName":"ROUTE_1"}]
+    offered = choices(original)
+    approach = next(choice for choice in offered if choice.id == "approach-exit:up")
+    assert "ROUTE_1" in approach.description and approach.kind == "travel"
+    assert approach.target == (2,1)
+    assert all(choice.id != "wait" for choice in offered)

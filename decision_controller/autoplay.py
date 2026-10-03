@@ -49,6 +49,7 @@ class Runner:
         self.failures = 0
         self.repeats = 0
         self.previous: tuple[str, str] | None = None
+        self.cycle_history: list[tuple[str, str]] = []
         # Explicit startup flag controls this run; persisted pause stays until
         # an explicit --autoplay launch or browser Resume instruction.
         atomic_json(self.control, {"enabled": args.autoplay, "revision": time.time_ns()})
@@ -67,7 +68,8 @@ class Runner:
         if not control.get("enabled"):
             self.previous = None
             self.repeats = 0
-            self.publish(autoplay=False, phase="paused")
+            self.cycle_history = []
+            self.publish(autoplay=False, phase="stuck" if self.status.get("phase") == "stuck" else "paused")
             self.stop.wait(0.5)
             return
         response = self.session.get(self.url + "/api/state", timeout=45)
@@ -92,11 +94,22 @@ class Runner:
             self.publish(phase="discarded", result="Control changed during inference")
             return
         key = (snapshot["fingerprint"], decision["choice_id"])
+        # Coordinates/mode/objective identify loops despite different facing,
+        # dialogue animation or alternating maps. Keep this separate from the
+        # exact fingerprint used to reject stale inference.
+        state = snapshot["state"]
+        identity = json.dumps({"location": state.get("location"), "mode": state.get("mode"),
+                               "goal": state.get("memory", {}).get("next_goal"),
+                               "completed": state.get("memory", {}).get("completed"),
+                               "party": state.get("party"), "bag": state.get("bag"),
+                               "battle": state.get("battle"), "dialog": state.get("dialog")}, sort_keys=True)
+        cycle_key = (identity, decision["choice_id"])
+        cycle_count = self.cycle_history.count(cycle_key)
         self.repeats = self.repeats + 1 if key == self.previous else 0
         self.previous = key
-        if self.repeats >= 12:
+        if self.repeats >= 12 or cycle_count >= 3:
             atomic_json(self.control, {"enabled": False, "revision": time.time_ns()})
-            self.publish(autoplay=False, phase="stuck", error="Repeated unchanged state/action; paused without resetting")
+            self.publish(autoplay=False, phase="stuck", error="Repeated state/action cycle without progress; paused without resetting")
             return
         self.publish(phase="executing")
         response = self.session.post(self.url + "/api/execute", json={"choice_id": decision["choice_id"],
@@ -105,6 +118,7 @@ class Runner:
             self.publish(phase="discarded", result="State changed during inference; re-observing")
             return
         response.raise_for_status()
+        self.cycle_history = [*self.cycle_history[-23:], cycle_key]
         self.publish(phase="observing", result=response.json(), decisions=self.status["decisions"] + 1)
         self.checkpoint()
         self.failures = 0

@@ -22,6 +22,13 @@ def test_normalization_preserves_model_ranking() -> None:
     assert probabilities == pytest.approx({"A":.25,"B":.75})
 
 
+def test_pallet_doorstep_guidance_distinguishes_route_from_house() -> None:
+    state = {"location":{"name":"PALLET_TOWN", "position":[6,8]},
+             "memory":{"next_goal":{"id":"starter", "hint":"Choose a starter"}}}
+    body = request_body(state, [{"label":"A", "id":"step:left", "description":"Move left"}], "test")
+    assert "UP from (6,8) re-enters the house" in body["messages"][0]["content"]
+
+
 def test_endpoint_request_and_output(tmp_path: Path) -> None:
     options = [{"label":"A", "id":"continue", "description":"Advance dialogue"},
                {"label":"B", "id":"wait", "description":"Wait"}]

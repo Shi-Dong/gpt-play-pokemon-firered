@@ -51,6 +51,7 @@ def test_pause_during_inference_discards_input(tmp_path: Path) -> None:
     runner.step()
     assert not runner.session.posts
     assert runner.status["phase"] == "discarded"
+    assert runner.cycle_history == []
 
 
 def test_stale_response_reobserves_without_checkpoint_or_reset(tmp_path: Path) -> None:
@@ -78,3 +79,104 @@ def test_unchanged_action_pauses_without_reset(tmp_path: Path) -> None:
     assert not read_json(runner.control)["enabled"]
     assert runner.status["phase"] == "stuck"
     assert all(url.endswith("/api/execute") for url, _ in runner.session.posts)
+
+
+def test_alternating_maps_are_detected_despite_changing_fingerprint(tmp_path: Path) -> None:
+    runner = runner_at(tmp_path)
+    class SequenceSession(Session):
+        def __init__(self) -> None:
+            super().__init__()
+            self.index = 0
+        def get(self, url: str, **kwargs: Any) -> Response:
+            index = self.index
+            class Snapshot(Response):
+                def json(self) -> dict[str, Any]:
+                    payload = super().json()
+                    payload["fingerprint"] = str(index)
+                    payload["state"].update(location={"id":str(index % 2), "position":[6,8]}, mode="overworld")
+                    return payload
+            return Snapshot()
+        def post(self, url: str, **kwargs: Any) -> Response:
+            response = super().post(url, **kwargs)
+            if url.endswith("/api/execute"):
+                self.index += 1
+                response.status_code = 200
+                response.ok = True
+            return response
+    class Model:
+        def decide(self, *args: Any) -> dict[str, Any]:
+            return decision()
+    runner.session = SequenceSession()
+    runner.model = Model()
+    for _ in range(7):
+        runner.step()
+    assert not read_json(runner.control)["enabled"]
+    assert runner.status["phase"] == "stuck"
+    assert "cycle" in runner.status["error"]
+    assert len([url for url, _ in runner.session.posts if url.endswith("/api/execute")]) == 6
+
+
+def test_changing_battle_state_is_progress_not_cycle(tmp_path: Path) -> None:
+    runner = runner_at(tmp_path)
+    class BattleSession(Session):
+        def __init__(self) -> None:
+            super().__init__()
+            self.hp = 100
+        def get(self, url: str, **kwargs: Any) -> Response:
+            hp = self.hp
+            class Snapshot(Response):
+                def json(self) -> dict[str, Any]:
+                    payload = super().json()
+                    payload["fingerprint"] = str(hp)
+                    payload["state"]["battle"] = {"enemy_hp":hp}
+                    return payload
+            return Snapshot()
+        def post(self, url: str, **kwargs: Any) -> Response:
+            response = super().post(url, **kwargs)
+            if url.endswith("/api/execute"):
+                self.hp -= 1
+                response.status_code = 200
+                response.ok = True
+            return response
+    class Model:
+        def decide(self, *args: Any) -> dict[str, Any]:
+            return decision()
+    runner.session = BattleSession()
+    runner.model = Model()
+    for _ in range(8):
+        runner.step()
+    assert read_json(runner.control)["enabled"]
+    assert runner.status["decisions"] == 8
+
+
+def test_new_dialogue_pages_are_progress_not_cycle(tmp_path: Path) -> None:
+    runner = runner_at(tmp_path)
+    class DialogueSession(Session):
+        def __init__(self) -> None:
+            super().__init__()
+            self.page = 1
+        def get(self, url: str, **kwargs: Any) -> Response:
+            page = self.page
+            class Snapshot(Response):
+                def json(self) -> dict[str, Any]:
+                    payload = super().json()
+                    payload["fingerprint"] = str(page)
+                    payload["state"]["dialog"] = {"currentPage":page, "visibleText":f"Page {page}"}
+                    return payload
+            return Snapshot()
+        def post(self, url: str, **kwargs: Any) -> Response:
+            response = super().post(url, **kwargs)
+            if url.endswith("/api/execute"):
+                self.page += 1
+                response.status_code = 200
+                response.ok = True
+            return response
+    class Model:
+        def decide(self, *args: Any) -> dict[str, Any]:
+            return decision()
+    runner.session = DialogueSession()
+    runner.model = Model()
+    for _ in range(8):
+        runner.step()
+    assert read_json(runner.control)["enabled"]
+    assert runner.status["decisions"] == 8

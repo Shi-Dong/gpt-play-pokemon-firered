@@ -113,7 +113,7 @@ class Memory:
         key = f"{before.map_id}:{choice_id}"
         self.data["targets"][key] = self.data["targets"].get(key, 0) + 1
         entry = {"choice": choice_id, "map": before.map_id, "from": before.position,
-                 "to": after.position, "after_mode": after.mode, "result": result}
+                 "to": after.position, "after_map": after.map_id, "after_mode": after.mode, "result": result}
         self.data["history"] = [*self.data["history"][-63:], entry]
         if result in {"blocked", "stale", "target_moved", "error"}:
             self.data["failures"] = [*self.data["failures"][-31:], entry]

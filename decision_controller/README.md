@@ -13,6 +13,8 @@ Without that worker, the viewer supports manual testing of the current adventure
 - Semantic selections for decoded choice menus, battle actions and available-PP
   moves; bounded cursor controls for complex naming, inventory, PC, Fly and
   quantity screens. These controls preserve access to the native game menus.
+- Named exploration toward map connections before their boundary is visible;
+  stable overworld choices omit idle Wait, while animation/dialogue modes retain it.
 - Local breadth-first shortest paths through discovered terrain. Respect walls,
   directional collision, one-way ledges and walking versus Surfing. Stop at
   warps/spinners; re-read and replan after every movement input.
@@ -122,8 +124,11 @@ This verifies the checkpoint and restores the associated memory and emulator
 state together. No automatic resets, rollback or adventure repetition exist.
 The worker attempts a checkpoint after each executed decision at a stable
 boundary and on graceful shutdown. The newest 20 pairs are retained. Three
-consecutive request/protocol errors or repeated unchanged state/action pause
-the worker and expose the error. Resume retries the existing adventure. Hall
+consecutive request/protocol errors or repeated state/action cycles pause
+the worker and expose the error. Cycle detection spans alternating maps and
+uses position, mode, objective, milestones, party, inventory, battle and dialogue state
+to distinguish progress from repetition; stale discarded calls are excluded.
+Resume retries the existing adventure. Hall
 of Fame evidence stops autonomous play; defeating an arbitrary trainer does not.
 
 ## Validation scope and remaining work

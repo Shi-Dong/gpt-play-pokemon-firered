@@ -116,6 +116,9 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
     warps = {tuple(warp["position"]): warp for warp in full_map.get("warp_events", []) if isinstance(warp.get("position"), list)}
     height = len(nav.grid)
     width = len(nav.grid[0]) if height else 0
+    frontiers = [pos for pos in paths if pos != state.position and nav.code(pos) not in PORTALS | FORCED and
+                 any(0 <= pos[0] + dx < width and 0 <= pos[1] + dy < height and
+                     nav.code((pos[0] + dx, pos[1] + dy)) is None for dx, dy in DIRECTIONS.values())]
     for connection in mapping(state.raw.get("map")).get("connections", []):
         direction = connection.get("direction")
         destination = connection.get("mapName")
@@ -131,6 +134,11 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
         for target in sorted(boundary, key=lambda pos: len(paths[pos]))[:3]:
             candidates.append((len(paths[target]), Choice(f"exit:{direction}:{target[0]}:{target[1]}",
                               f"Travel {direction} to {destination}", "exit", (direction,), target)))
+        if not boundary and frontiers:
+            dx, dy = DIRECTIONS[direction]
+            target = min(frontiers, key=lambda pos: (-(pos[0]*dx + pos[1]*dy), len(paths[pos])))
+            candidates.append((len(paths[target]), Choice(f"approach-exit:{direction}",
+                              f"Explore toward the {direction} exit to {destination} via {target}", "travel", target=target)))
     for y, row in enumerate(nav.grid):
         for x, code in enumerate(row):
             target = (x, y)
@@ -165,9 +173,6 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
                     candidates.append((len(paths[target]), Choice(f"travel:{x}:{y}", f"Enter {destination} via ({x},{y})", "travel", target=target)))
                 elif any(0 <= x + dx < width and 0 <= y + dy < height and nav.code((x + dx, y + dy)) is None for dx, dy in DIRECTIONS.values()):
                     candidates.append((len(paths[target]) + 10, Choice(f"explore:{x}:{y}", f"Explore undiscovered terrain near ({x},{y})", "travel", target=target)))
-    frontiers = [pos for pos in paths if pos != state.position and nav.code(pos) not in PORTALS | FORCED and
-                 any(0 <= pos[0] + dx < width and 0 <= pos[1] + dy < height and
-                     nav.code((pos[0] + dx, pos[1] + dy)) is None for dx, dy in DIRECTIONS.values())]
     for target, warp in warps.items():
         if target in paths or not frontiers:
             continue
@@ -189,5 +194,6 @@ def choices(state: State, memory: dict[str, Any] | None = None) -> list[Choice]:
             break
     # Named destinations and interactions precede cursor-sized movement choices.
     result.extend(basic)
-    result.append(Choice("wait", "Wait for the game to settle", "wait"))
+    # A settled, unlocked overworld has no pending animation to wait for.
+    # Dialogue/battle/locked modes retain their separate Wait choices.
     return result
